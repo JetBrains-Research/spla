@@ -192,10 +192,12 @@ TEST(Basic, ReduceMGPU) {
     auto N = 1000000;
     auto N2 = N / 2;
     auto R = 10;
-    auto ctx = compute::system::default_context();
-    auto devices = ctx.get_devices();
+    auto platform = compute::system::default_device().platform();
+    auto devices = platform.devices();
+    auto ctx = compute::context(devices);
 
-    std::cout << ctx.get_device().platform().name() << std::endl;
+    std::cout << "default platform: " << platform.name() << std::endl;
+    std::cout << "devices: " << devices.size() << std::endl;
 
     if (devices.size() == 2) {
         compute::command_queue q1(ctx, devices[0]);
