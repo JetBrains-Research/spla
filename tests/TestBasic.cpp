@@ -26,9 +26,12 @@
 /**********************************************************************************/
 
 #include <Testing.hpp>
-#include <algorithm>
+
 #include <boost/compute.hpp>
+
+#include <algorithm>
 #include <chrono>
+#include <iostream>
 #include <random>
 #include <vector>
 
@@ -180,6 +183,66 @@ TEST(Basic, SortIndices) {
         EXPECT_TRUE(i <= I[k] || (i == I[k] && j <= J[k]));
         i = I[k];
         j = J[k];
+    }
+}
+
+TEST(Basic, ReduceMGPU) {
+    namespace compute = boost::compute;
+
+    auto N = 1000000;
+    auto N2 = N / 2;
+    auto R = 10;
+    auto ctx = compute::system::default_context();
+    auto devices = ctx.get_devices();
+
+    std::cout << ctx.get_device().platform().name() << std::endl;
+
+    if (devices.size() == 2) {
+        compute::command_queue q1(ctx, devices[0]);
+        compute::command_queue q2(ctx, devices[1]);
+
+        std::vector<unsigned int> source(N);
+        for (std::size_t i = 0; i < N; i++)
+            source[i] = (i ^ 0xf0f0abeu) + 13 * i;
+
+        {
+            compute::vector<unsigned int> buff(N, ctx);
+            for (int i = 0; i < R; i++) {
+                compute::vector<unsigned int> res(1, ctx);
+                compute::copy(source.begin(), source.end(), buff.begin(), q1);
+                SPLA_TIME_BEGIN(t);
+                compute::reduce(buff.begin(), buff.end(), res.begin(), q1);
+                SPLA_TIME_END(t, "d1");
+            }
+        }
+
+        {
+            compute::vector<unsigned int> buff(N, ctx);
+            for (int i = 0; i < R; i++) {
+                compute::vector<unsigned int> res1(1, ctx);
+                compute::vector<unsigned int> res2(1, ctx);
+                compute::copy(source.begin(), source.end(), buff.begin(), q1);
+                SPLA_TIME_BEGIN(t);
+                compute::reduce(buff.begin() + 0 * N2, buff.begin() + 1 * N2, res1.begin(), q1);
+                compute::reduce(buff.begin() + 1 * N2, buff.begin() + 2 * N2, res2.begin(), q2);
+                SPLA_TIME_END(t, "d2-b1");
+            }
+        }
+
+        {
+            compute::vector<unsigned int> buff0(N2, ctx);
+            compute::vector<unsigned int> buff1(N2, ctx);
+            for (int i = 0; i < R; i++) {
+                compute::vector<unsigned int> res1(1, ctx);
+                compute::vector<unsigned int> res2(1, ctx);
+                compute::copy(source.begin() + 0 * N2, source.begin() + 1 * N2, buff0.begin(), q1);
+                compute::copy(source.begin() + 1 * N2, source.begin() + 2 * N2, buff1.begin(), q2);
+                SPLA_TIME_BEGIN(t);
+                compute::reduce(buff0.begin(), buff0.end(), res1.begin(), q1);
+                compute::reduce(buff1.begin(), buff1.end(), res2.begin(), q2);
+                SPLA_TIME_END(t, "d2-b2");
+            }
+        }
     }
 }
 
