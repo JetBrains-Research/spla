@@ -30,9 +30,11 @@
 #include <boost/compute.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <iostream>
 #include <random>
+#include <thread>
 #include <vector>
 
 TEST(Basic, BoostExample) {
@@ -186,18 +188,20 @@ TEST(Basic, SortIndices) {
     }
 }
 
-TEST(Basic, ReduceMGPU) {
+TEST(Basic, TrnasformMGPU) {
     namespace compute = boost::compute;
 
-    auto N = 1000000;
-    auto N2 = N / 2;
-    auto R = 10;
+    std::size_t N = 1000000000;
+    std::size_t N2 = N / 2;
+    std::size_t R = 10;
     auto platform = compute::system::default_device().platform();
     auto devices = platform.devices();
     auto ctx = compute::context(devices);
 
     std::cout << "default platform: " << platform.name() << std::endl;
     std::cout << "devices: " << devices.size() << std::endl;
+
+    using compute::lambda::_1;
 
     if (devices.size() == 2) {
         compute::command_queue q1(ctx, devices[0]);
@@ -209,41 +213,102 @@ TEST(Basic, ReduceMGPU) {
 
         {
             compute::vector<unsigned int> buff(N, ctx);
-            for (int i = 0; i < R; i++) {
-                compute::vector<unsigned int> res(1, ctx);
-                compute::copy(source.begin(), source.end(), buff.begin(), q1);
+            compute::vector<unsigned int> res(N, ctx);
+            compute::copy(source.begin(), source.end(), buff.begin(), q1);
+            for (std::size_t i = 0; i < R; i++) {
                 SPLA_TIME_BEGIN(t);
-                compute::reduce(buff.begin(), buff.end(), res.begin(), q1);
+                compute::transform(buff.begin(), buff.end(), res.begin(), _1 + _1, q1);
+                q1.finish();
                 SPLA_TIME_END(t, "d1");
             }
         }
 
         {
             compute::vector<unsigned int> buff(N, ctx);
-            for (int i = 0; i < R; i++) {
-                compute::vector<unsigned int> res1(1, ctx);
-                compute::vector<unsigned int> res2(1, ctx);
-                compute::copy(source.begin(), source.end(), buff.begin(), q1);
+            compute::vector<unsigned int> res(N2, ctx);
+            compute::copy(source.begin(), source.end(), buff.begin(), q1);
+            for (std::size_t i = 0; i < R; i++) {
                 SPLA_TIME_BEGIN(t);
-                compute::reduce(buff.begin() + 0 * N2, buff.begin() + 1 * N2, res1.begin(), q1);
-                compute::reduce(buff.begin() + 1 * N2, buff.begin() + 2 * N2, res2.begin(), q2);
-                SPLA_TIME_END(t, "d2-b1");
+                compute::transform(buff.begin(), buff.begin() + N2, res.begin(), _1 + _1, q1);
+                q1.finish();
+                SPLA_TIME_END(t, "d1-h");
             }
         }
 
         {
-            compute::vector<unsigned int> buff0(N2, ctx);
-            compute::vector<unsigned int> buff1(N2, ctx);
-            for (int i = 0; i < R; i++) {
-                compute::vector<unsigned int> res1(1, ctx);
-                compute::vector<unsigned int> res2(1, ctx);
-                compute::copy(source.begin() + 0 * N2, source.begin() + 1 * N2, buff0.begin(), q1);
-                compute::copy(source.begin() + 1 * N2, source.begin() + 2 * N2, buff1.begin(), q2);
+            compute::vector<unsigned int> buff(N, ctx);
+            compute::vector<unsigned int> res1(N2, ctx);
+            compute::vector<unsigned int> res2(N2, ctx);
+            compute::copy(source.begin(), source.end(), buff.begin(), q1);
+            for (std::size_t i = 0; i < R; i++) {
                 SPLA_TIME_BEGIN(t);
-                compute::reduce(buff0.begin(), buff0.end(), res1.begin(), q1);
-                compute::reduce(buff1.begin(), buff1.end(), res2.begin(), q2);
-                SPLA_TIME_END(t, "d2-b2");
+                compute::transform(buff.begin() + 0 * N2, buff.begin() + 1 * N2, res1.begin(), _1 + _1, q1);
+                compute::transform(buff.begin() + 1 * N2, buff.begin() + 2 * N2, res2.begin(), _1 + _1, q2);
+                q1.finish();
+                q2.finish();
+                SPLA_TIME_END(t, "d2-r1");
             }
+        }
+
+        {
+            compute::vector<unsigned int> buff1(N2, ctx);
+            compute::vector<unsigned int> buff2(N2, ctx);
+            compute::vector<unsigned int> res1(N2, ctx);
+            compute::vector<unsigned int> res2(N2, ctx);
+            compute::copy(source.begin() + 0 * N2, source.begin() + 1 * N2, buff1.begin(), q1);
+            compute::copy(source.begin() + 1 * N2, source.begin() + 2 * N2, buff2.begin(), q2);
+            for (std::size_t i = 0; i < R; i++) {
+                SPLA_TIME_BEGIN(t);
+                compute::transform(buff1.begin(), buff1.end(), res1.begin(), _1 + _1, q1);
+                compute::transform(buff2.begin(), buff2.end(), res2.begin(), _1 + _1, q2);
+                q1.finish();
+                q2.finish();
+                SPLA_TIME_END(t, "d2-r2");
+            }
+        }
+
+        {
+            compute::vector<unsigned int> buff1(N2, ctx);
+            compute::vector<unsigned int> buff2(N2, ctx);
+            compute::vector<unsigned int> res1(N2, ctx);
+            compute::vector<unsigned int> res2(N2, ctx);
+            compute::copy(source.begin() + 0 * N2, source.begin() + 1 * N2, buff1.begin(), q1);
+            compute::copy(source.begin() + 1 * N2, source.begin() + 2 * N2, buff2.begin(), q2);
+
+            std::atomic_bool f1{false};
+            std::atomic_bool f2{false};
+            std::atomic_bool s1{false};
+            std::atomic_bool s2{false};
+            std::thread t1([&]() {
+                while (!f1.load()) {
+                    if (s1.load()) {
+                        compute::transform(buff1.begin(), buff1.end(), res1.begin(), _1 + _1, q1);
+                        q1.finish();
+                        s1.store(false);
+                    }
+                }
+            });
+            std::thread t2([&]() {
+                while (!f2.load()) {
+                    if (s2.load()) {
+                        compute::transform(buff2.begin(), buff2.end(), res2.begin(), _1 + _1, q2);
+                        q2.finish();
+                        s2.store(false);
+                    }
+                }
+            });
+
+            for (std::size_t i = 0; i < R; i++) {
+                SPLA_TIME_BEGIN(t);
+                s1.store(true);
+                s2.store(true);
+                while (s1.load() || s2.load()) {}
+                SPLA_TIME_END(t, "d2-r2-mt");
+            }
+            f1.store(true);
+            f2.store(true);
+            t1.join();
+            t2.join();
         }
     }
 }
