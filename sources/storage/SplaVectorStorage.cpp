@@ -71,6 +71,7 @@ void spla::VectorStorage::SetBlock(const Index &index, const RefPtr<VectorBlock>
     compute::device device = mLibrary.GetPrivate().GetDeviceManager().GetDevice(deviceId);
     compute::command_queue queue(mLibrary.GetPrivate().GetContext(), device);
     SetBlock(index, block, queue);
+    queue.finish();
 }
 
 void spla::VectorStorage::GetBlocks(spla::VectorStorage::EntryList &entryList) const {
