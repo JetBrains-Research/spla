@@ -88,3 +88,9 @@ void spla::VectorCOO::Dump(std::ostream &stream, unsigned int baseI) const {
                << std::dec;
     }
 }
+
+spla::RefPtr<spla::VectorBlock> spla::VectorCOO::Clone(boost::compute::command_queue &queue) const {
+    Indices rows(mRows.begin(), mRows.end(), queue);
+    Values values(mVals.begin(), mVals.end(), queue);
+    return Make(GetNrows(), GetNvals(), std::move(rows), std::move(values)).As<VectorBlock>();
+}

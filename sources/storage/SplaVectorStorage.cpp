@@ -25,6 +25,7 @@
 /* SOFTWARE.                                                                      */
 /**********************************************************************************/
 
+#include <core/SplaDeviceManager.hpp>
 #include <core/SplaLibraryPrivate.hpp>
 #include <core/SplaMath.hpp>
 #include <storage/SplaVectorStorage.hpp>
@@ -32,7 +33,7 @@
 void spla::VectorStorage::Clear() {
     std::lock_guard<std::mutex> lock(mMutex);
     mNvals = 0;
-    mBlocks.clear();
+    for (auto &b : mBlocks) b.clear();
 }
 
 void spla::VectorStorage::SetBlock(const spla::VectorStorage::Index &index, const spla::RefPtr<spla::VectorBlock> &block) {
@@ -40,7 +41,7 @@ void spla::VectorStorage::SetBlock(const spla::VectorStorage::Index &index, cons
     assert(block.IsNotNull());
 
     std::lock_guard<std::mutex> lock(mMutex);
-    auto &prev = mBlocks[index];
+    auto &prev = mBlocks.front()[index];
 
     if (prev.IsNotNull())
         mNvals -= prev->GetNvals();
@@ -49,26 +50,50 @@ void spla::VectorStorage::SetBlock(const spla::VectorStorage::Index &index, cons
     mNvals += block->GetNvals();
 }
 
+void spla::VectorStorage::SetBlock(const Index &index, const RefPtr<VectorBlock> &block, boost::compute::command_queue &queue) {
+    assert(index < mNblockRows);
+    assert(block.IsNotNull());
+
+    std::lock_guard<std::mutex> lock(mMutex);
+    auto &prev = mBlocks.front()[index];
+
+    if (prev.IsNotNull())
+        mNvals -= prev->GetNvals();
+
+    prev = block;
+    mNvals += block->GetNvals();
+
+    for (std::size_t i = 1; i < mBlocks.size(); i++) mBlocks[i][index] = block->Clone(queue);
+}
+
+void spla::VectorStorage::SetBlock(const Index &index, const RefPtr<VectorBlock> &block, std::size_t deviceId) {
+    using namespace boost;
+    compute::device device = mLibrary.GetPrivate().GetDeviceManager().GetDevice(deviceId);
+    compute::command_queue queue(mLibrary.GetPrivate().GetContext(), device);
+    SetBlock(index, block, queue);
+}
+
 void spla::VectorStorage::GetBlocks(spla::VectorStorage::EntryList &entryList) const {
     std::lock_guard<std::mutex> lock(mMutex);
     entryList.clear();
-    entryList.insert(entryList.begin(), mBlocks.begin(), mBlocks.end());
+    entryList.insert(entryList.begin(), mBlocks.front().begin(), mBlocks.front().end());
 }
 
 void spla::VectorStorage::GetBlocks(EntryMap &entryMap) const {
     std::lock_guard<std::mutex> lock(mMutex);
-    entryMap = mBlocks;
+    entryMap = mBlocks.front();
 }
 
 void spla::VectorStorage::GetBlocksGrid(std::size_t &rows) const {
     rows = mNblockRows;
 }
 
-spla::RefPtr<spla::VectorBlock> spla::VectorStorage::GetBlock(const spla::VectorStorage::Index &index) const {
+spla::RefPtr<spla::VectorBlock> spla::VectorStorage::GetBlock(const spla::VectorStorage::Index &index, std::size_t deviceId) const {
     assert(index < mNblockRows);
+    assert(deviceId < mBlocks.size());
     std::lock_guard<std::mutex> lock(mMutex);
-    auto entry = mBlocks.find(index);
-    return entry != mBlocks.end() ? entry->second : nullptr;
+    auto entry = mBlocks[deviceId].find(index);
+    return entry != mBlocks[deviceId].end() ? entry->second : nullptr;
 }
 
 std::size_t spla::VectorStorage::GetNrows() const noexcept {
@@ -88,13 +113,14 @@ spla::VectorStorage::VectorStorage(std::size_t nrows, spla::Library &library)
     : mNrows(nrows), mLibrary(library) {
     mBlockSize = mLibrary.GetPrivate().GetBlockSize();
     mNblockRows = math::GetBlocksCount(nrows, mBlockSize);
+    mBlocks.resize(library.GetPrivate().GetDeviceManager().GetDevicesCount());
 }
 
 void spla::VectorStorage::RemoveBlock(const spla::VectorStorage::Index &index) {
     assert(index < mNblockRows);
 
     std::lock_guard<std::mutex> lock(mMutex);
-    mBlocks.erase(index);
+    for (auto &b : mBlocks) b.erase(index);
 }
 
 std::size_t spla::VectorStorage::GetNblockRows() const noexcept {
@@ -116,7 +142,7 @@ void spla::VectorStorage::Dump(std::ostream &stream) const {
 
     auto bsize = static_cast<unsigned int>(mBlockSize);
 
-    for (auto &entry : mBlocks) {
+    for (auto &entry : mBlocks.front()) {
         auto index = entry.first;
         auto &block = entry.second;
         stream << "Block (" << index << ") ";

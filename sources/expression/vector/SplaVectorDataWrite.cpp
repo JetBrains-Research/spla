@@ -191,7 +191,7 @@ void spla::VectorDataWrite::Process(std::size_t nodeIdx, const spla::Expression 
 
             // Allocate result block and set in storage
             auto block = VectorCOO::Make(blockNrows, blockNvals, std::move(blockRows), std::move(blockVals));
-            storage->SetBlock(blockIndex, block.As<VectorBlock>());
+            storage->SetBlock(blockIndex, block.As<VectorBlock>(), queue);
         });
     }
 }

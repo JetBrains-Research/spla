@@ -89,3 +89,9 @@ void spla::VectorDense::Dump(std::ostream &stream, unsigned int baseI) const {
         }
     }
 }
+
+spla::RefPtr<spla::VectorBlock> spla::VectorDense::Clone(boost::compute::command_queue &queue) const {
+    Mask mask(mMask.begin(), mMask.end(), queue);
+    Values vals(mVals.begin(), mVals.end(), queue);
+    return Make(GetNrows(), GetNvals(), std::move(mask), std::move(vals)).As<VectorBlock>();
+}

@@ -53,6 +53,8 @@ namespace spla {
 
         void Dump(std::ostream &stream, unsigned int baseI) const override;
 
+        RefPtr<VectorBlock> Clone(boost::compute::command_queue &queue) const override;
+
         static RefPtr<VectorCOO> Make(std::size_t nrows, std::size_t nvals, Indices rows, Values vals);
 
     private:

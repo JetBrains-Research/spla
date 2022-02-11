@@ -173,9 +173,9 @@ void spla::VxM::Process(std::size_t nodeIdx, const spla::Expression &expression,
             auto deviceId = devicesForProducts[deviceToFetch];
             auto aIdx = toProcess.a;
             auto bIdx = toProcess.b;
-            auto aBlock = aBlocks.find(aIdx)->second;
-            auto bBlock = bBlocks.find(bIdx)->second;
-            auto maskBlock = GetMaskBlock(maskBlocks, IndexV{bIdx.second});
+            auto aBlock = a->GetStorage()->GetBlock(aIdx, deviceId);
+            auto bBlock = b->GetStorage()->GetBlock(bIdx);
+            auto maskBlock = mask->GetStorage()->GetBlock(IndexV{bIdx.second}, deviceId);
             auto task = builder.Emplace("vxm", [=]() {
                 assert(aBlock->GetNrows() == bBlock->GetNrows());
                 ParamsVxM params;
@@ -242,7 +242,7 @@ void spla::VxM::Process(std::size_t nodeIdx, const spla::Expression &expression,
 
                 // Store final result
                 IndexV index{static_cast<unsigned int>(j)};
-                w->GetStorage()->SetBlock(index, block);
+                w->GetStorage()->SetBlock(index, block, deviceId);
             });
 
             // Setup dependencies

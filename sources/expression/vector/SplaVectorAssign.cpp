@@ -78,33 +78,33 @@ void spla::VectorAssign::Process(std::size_t nodeIdx, const spla::Expression &ex
             params.deviceId = deviceId;
             params.size = math::GetBlockActualSize(blockIdx, dim, blockSize);
             params.hasMask = mask.IsNotNull();
-            params.mask = mask.IsNotNull() ? mask->GetStorage()->GetBlock(i) : RefPtr<VectorBlock>{};
+            params.mask = mask.IsNotNull() ? mask->GetStorage()->GetBlock(i, deviceId) : RefPtr<VectorBlock>{};
             params.s = s.IsNotNull() ? s->GetStorage()->GetValue(deviceId) : RefPtr<ScalarValue>{};
             params.type = w->GetType();
             library->GetAlgoManager()->Dispatch(Algorithm::Type::VectorAssign, params);
 
             if (params.w.IsNotNull()) {
-                tmp->GetStorage()->SetBlock(i, params.w);
+                tmp->GetStorage()->SetBlock(i, params.w, deviceId);
                 SPDLOG_LOGGER_TRACE(logger, "Assign block i={} nnz={}", i, params.w->GetNvals());
             }
         });
 
         if (applyAccum) {
             auto accumTask = builder.Emplace("vec-accum", [=]() {
-                auto tmpBlock = tmp->GetStorage()->GetBlock(i);
+                auto tmpBlock = tmp->GetStorage()->GetBlock(i, deviceId);
 
                 if (tmpBlock.IsNotNull()) {
                     ParamsVectorEWiseAdd params;
                     params.desc = desc;
                     params.deviceId = deviceId;
-                    params.a = w->GetStorage()->GetBlock(i);
-                    params.b = tmp->GetStorage()->GetBlock(i);
+                    params.a = w->GetStorage()->GetBlock(i, deviceId);
+                    params.b = tmp->GetStorage()->GetBlock(i, deviceId);
                     params.op = accum;
                     params.type = w->GetType();
                     library->GetAlgoManager()->Dispatch(Algorithm::Type::VectorEWiseAdd, params);
 
                     if (params.w.IsNotNull()) {
-                        w->GetStorage()->SetBlock(i, params.w);
+                        w->GetStorage()->SetBlock(i, params.w, deviceId);
                         SPDLOG_LOGGER_TRACE(logger, "Accum block i={} nnz={}", i, params.w->GetNvals());
                     }
                 }

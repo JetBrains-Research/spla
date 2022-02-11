@@ -76,7 +76,7 @@ void spla::VectorReduce::Process(std::size_t nodeIdx, const spla::Expression &ex
                 ParamsVectorReduce params;
                 params.desc = desc;
                 params.deviceId = deviceId;
-                params.vec = blockVec;
+                params.vec = argV->GetStorage()->GetBlock(i, deviceId);
                 params.type = argV->GetType();
                 params.reduce = argOp;
                 library->GetAlgoManager()->Dispatch(Algorithm::Type::VectorReduce, params);
@@ -94,7 +94,7 @@ void spla::VectorReduce::Process(std::size_t nodeIdx, const spla::Expression &ex
         auto &ctx = library->GetContext();
         auto queue = boost::compute::command_queue(ctx, library->GetDeviceManager().GetDevice(lastReduceDeviceId));
         QueueFinisher finisher(queue, logger);
-        argS->GetStorage()->SetValue(ScalarValue::Make(intermediateBuffer->Reduce(argOp, queue)));
+        argS->GetStorage()->SetValue(ScalarValue::Make(intermediateBuffer->Reduce(argOp, queue)), queue);
         SPDLOG_LOGGER_TRACE(logger, "Final reduce of intermediate buffer, nnz={}", intermediateBuffer->GetNScalars());
     });
 

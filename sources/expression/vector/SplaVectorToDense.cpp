@@ -75,12 +75,12 @@ void spla::VectorToDense::Process(std::size_t nodeIdx, const spla::Expression &e
             ParamsVectorToDense params;
             params.deviceId = deviceId;
             params.desc = desc;
-            params.v = entry.second;
+            params.v = argV->GetStorage()->GetBlock(entry.first, deviceId);
             params.byteSize = argV->GetType()->GetByteSize();
             library->GetAlgoManager()->Dispatch(Algorithm::Type::VectorToDense, params);
 
             if (params.w.IsNotNull()) {
-                argW->GetStorage()->SetBlock(entry.first, params.w);
+                argW->GetStorage()->SetBlock(entry.first, params.w, deviceId);
                 SPDLOG_LOGGER_TRACE(library->GetLogger(), "Convert block={} to dense", entry.first);
             }
         });

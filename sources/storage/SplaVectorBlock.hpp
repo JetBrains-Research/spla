@@ -28,6 +28,8 @@
 #ifndef SPLA_SPLAVECTORBLOCK_HPP
 #define SPLA_SPLAVECTORBLOCK_HPP
 
+#include <boost/compute/command_queue.hpp>
+
 #include <spla-cpp/SplaRefCnt.hpp>
 
 namespace spla {
@@ -82,6 +84,9 @@ namespace spla {
 
         /** Dump vector content to provided stream */
         virtual void Dump(std::ostream &stream, unsigned int baseI) const = 0;
+
+        /** Clone vector block */
+        virtual RefPtr<VectorBlock> Clone(boost::compute::command_queue &queue) const = 0;
 
     protected:
         std::size_t mNrows;

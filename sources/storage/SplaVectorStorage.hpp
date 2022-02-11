@@ -28,9 +28,12 @@
 #ifndef SPLA_SPLAVECTORSTORAGE_HPP
 #define SPLA_SPLAVECTORSTORAGE_HPP
 
-#include <mutex>
+#include <boost/compute/command_queue.hpp>
+
 #include <spla-cpp/SplaLibrary.hpp>
 #include <storage/SplaVectorBlock.hpp>
+
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -60,6 +63,12 @@ namespace spla {
         /** Set block at specified block index */
         void SetBlock(const Index &index, const RefPtr<VectorBlock> &block);
 
+        /** Set block at specified block index */
+        void SetBlock(const Index &index, const RefPtr<VectorBlock> &block, boost::compute::command_queue &queue);
+
+        /** Set block at specified block index */
+        void SetBlock(const Index &index, const RefPtr<VectorBlock> &block, std::size_t deviceId);
+
         /** Remove block at specified block index (if present) */
         void RemoveBlock(const Index &index);
 
@@ -73,7 +82,7 @@ namespace spla {
         void GetBlocksGrid(std::size_t &rows) const;
 
         /** @return Block at specified index; may be null */
-        [[nodiscard]] RefPtr<VectorBlock> GetBlock(const Index &index) const;
+        [[nodiscard]] RefPtr<VectorBlock> GetBlock(const Index &index, std::size_t deviceId = 0) const;
 
         /** @return Number of rows of the storage */
         [[nodiscard]] std::size_t GetNrows() const noexcept;
@@ -98,7 +107,8 @@ namespace spla {
     private:
         VectorStorage(std::size_t nrows, Library &library);
 
-        EntryMap mBlocks;
+        std::vector<EntryMap> mBlocks;
+
         std::size_t mNrows;
         std::size_t mNvals = 0;
         std::size_t mNblockRows = 0;
