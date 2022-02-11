@@ -28,7 +28,9 @@
 #ifndef SPLA_SPLASCALARVALUE_HPP
 #define SPLA_SPLASCALARVALUE_HPP
 
+#include <boost/compute/command_queue.hpp>
 #include <boost/compute/container/vector.hpp>
+
 #include <spla-cpp/SplaRefCnt.hpp>
 
 namespace spla {
@@ -40,6 +42,8 @@ namespace spla {
         ~ScalarValue() override = default;
 
         [[nodiscard]] const Value &GetVal() const noexcept;
+
+        [[nodiscard]] RefPtr<ScalarValue> Clone(boost::compute::command_queue &queue) const;
 
         void Dump(std::ostream &stream) const;
 

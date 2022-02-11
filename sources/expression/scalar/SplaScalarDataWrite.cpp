@@ -68,7 +68,7 @@ void spla::ScalarDataWrite::Process(std::size_t nodeIdx, const spla::Expression 
     compute::copy(hostValue, hostValue + byteSize, deviceValue.begin(), queue);
 
     auto scalarValue = ScalarValue::Make(std::move(deviceValue));
-    scalar->GetStorage()->SetValue(scalarValue);
+    scalar->GetStorage()->SetValue(scalarValue, queue);
 
     SPDLOG_LOGGER_TRACE(library.GetLogger(), "Write value byteSize={}", byteSize);
 }

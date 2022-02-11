@@ -28,8 +28,11 @@
 #ifndef SPLA_SPLASCALARSTORAGE_HPP
 #define SPLA_SPLASCALARSTORAGE_HPP
 
-#include <mutex>
+#include <boost/compute/command_queue.hpp>
+
 #include <spla-cpp/SplaLibrary.hpp>
+
+#include <mutex>
 
 namespace spla {
 
@@ -48,6 +51,9 @@ namespace spla {
         /** Set scalar value */
         void SetValue(const RefPtr<class ScalarValue> &value);
 
+        /** Set scalar value */
+        void SetValue(const RefPtr<class ScalarValue> &value, boost::compute::command_queue &queue);
+
         /** Removes scalar value if present */
         void RemoveValue();
 
@@ -55,7 +61,7 @@ namespace spla {
         bool HasValue() const;
 
         /** @return Returns scalar value; may be null if not presented */
-        RefPtr<class ScalarValue> GetValue() const;
+        RefPtr<class ScalarValue> GetValue(std::size_t deviceId = 0) const;
 
         /** Dump scalar content to provided stream */
         void Dump(std::ostream &stream) const;
@@ -68,7 +74,7 @@ namespace spla {
     private:
         explicit ScalarStorage(Library &library);
 
-        RefPtr<class ScalarValue> mValue;
+        std::vector<RefPtr<class ScalarValue>> mValues;
 
         Library &mLibrary;
         mutable std::mutex mMutex;

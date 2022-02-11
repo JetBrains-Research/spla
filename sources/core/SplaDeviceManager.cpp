@@ -106,6 +106,10 @@ const std::vector<spla::DeviceManager::Device> &spla::DeviceManager::GetDevices(
     return mDevices;
 }
 
+const std::size_t spla::DeviceManager::GetDevicesCount() const {
+    return mDevices.size();
+}
+
 spla::DeviceManager::DeviceManager(std::vector<Device> devices) : mDevices(std::move(devices)) {
     assert(!mDevices.empty());
 }

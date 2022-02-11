@@ -79,7 +79,7 @@ void spla::VectorAssign::Process(std::size_t nodeIdx, const spla::Expression &ex
             params.size = math::GetBlockActualSize(blockIdx, dim, blockSize);
             params.hasMask = mask.IsNotNull();
             params.mask = mask.IsNotNull() ? mask->GetStorage()->GetBlock(i) : RefPtr<VectorBlock>{};
-            params.s = s.IsNotNull() ? s->GetStorage()->GetValue() : RefPtr<ScalarValue>{};
+            params.s = s.IsNotNull() ? s->GetStorage()->GetValue(deviceId) : RefPtr<ScalarValue>{};
             params.type = w->GetType();
             library->GetAlgoManager()->Dispatch(Algorithm::Type::VectorAssign, params);
 

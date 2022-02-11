@@ -25,6 +25,8 @@
 /* SOFTWARE.                                                                      */
 /**********************************************************************************/
 
+#include <core/SplaDeviceManager.hpp>
+#include <core/SplaLibraryPrivate.hpp>
 #include <storage/SplaScalarStorage.hpp>
 #include <storage/SplaScalarValue.hpp>
 
@@ -34,34 +36,43 @@ void spla::ScalarStorage::SetValue(const RefPtr<ScalarValue> &value) {
     assert(value.IsNotNull());
 
     std::lock_guard<std::mutex> lock(mMutex);
-    mValue = value;
+    mValues.front() = value;
+}
+
+void spla::ScalarStorage::SetValue(const RefPtr<class ScalarValue> &value, boost::compute::command_queue &queue) {
+    assert(value.IsNotNull());
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    mValues.front() = value;
+    for (std::size_t i = 1; i < mValues.size(); i++) mValues[i] = value->Clone(queue);
 }
 
 void spla::ScalarStorage::RemoveValue() {
     std::lock_guard<std::mutex> lock(mMutex);
-    mValue.Reset();
+    for (auto &v : mValues) v.Reset();
 }
 
 bool spla::ScalarStorage::HasValue() const {
     std::lock_guard<std::mutex> lock(mMutex);
-    return mValue.IsNotNull();
+    return mValues.front().IsNotNull();
 }
 
-spla::RefPtr<spla::ScalarValue> spla::ScalarStorage::GetValue() const {
+spla::RefPtr<spla::ScalarValue> spla::ScalarStorage::GetValue(std::size_t deviceId) const {
     std::lock_guard<std::mutex> lock(mMutex);
-    return mValue;
+    assert(deviceId < mValues.size());
+    return mValues[deviceId];
 }
 
 void spla::ScalarStorage::Dump(std::ostream &stream) const {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (mValue.IsNotNull()) mValue->Dump(stream);
+    if (mValues.front().IsNotNull()) mValues.front()->Dump(stream);
 }
 
 spla::RefPtr<spla::ScalarStorage> spla::ScalarStorage::Clone() const {
     std::lock_guard<std::mutex> lock(mMutex);
 
     auto storage = Make(mLibrary);
-    storage->mValue = mValue;
+    storage->mValues = mValues;
 
     return storage;
 }
@@ -71,4 +82,5 @@ spla::RefPtr<spla::ScalarStorage> spla::ScalarStorage::Make(spla::Library &libra
 }
 
 spla::ScalarStorage::ScalarStorage(spla::Library &library) : mLibrary(library) {
+    mValues.resize(library.GetPrivate().GetDeviceManager().GetDevicesCount());
 }

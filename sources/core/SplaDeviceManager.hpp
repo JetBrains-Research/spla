@@ -85,6 +85,12 @@ namespace spla {
          */
         const std::vector<Device> &GetDevices() const;
 
+        /**
+         * Get devices count.
+         * @return Devices count.
+         */
+        const std::size_t GetDevicesCount() const;
+
     private:
         friend class LibraryPrivate;
         explicit DeviceManager(std::vector<Device> devices);

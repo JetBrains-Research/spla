@@ -31,6 +31,11 @@ const spla::ScalarValue::Value &spla::ScalarValue::GetVal() const noexcept {
     return mValue;
 }
 
+spla::RefPtr<spla::ScalarValue> spla::ScalarValue::Clone(boost::compute::command_queue &queue) const {
+    Value value(mValue.begin(), mValue.end(), queue);
+    return Make(std::move(value));
+}
+
 void spla::ScalarValue::Dump(std::ostream &stream) const {
     using namespace boost;
     compute::context context = mValue.get_buffer().get_context();
